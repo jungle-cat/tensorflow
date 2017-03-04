@@ -50,6 +50,8 @@ HloOpcode UnaryOperationToHloOpcode(UnaryOperation unop) {
       return HloOpcode::kExp;
     case UNOP_FLOOR:
       return HloOpcode::kFloor;
+    case UNOP_IS_FINITE:
+      return HloOpcode::kIsFinite;
     case UNOP_LOG:
       return HloOpcode::kLog;
     case UNOP_LOGICAL_NOT:
@@ -889,6 +891,14 @@ Status UserComputation::AddOutfeedInstruction(
     const OutfeedRequest& outfeed_request) {
   tensorflow::mutex_lock lock(mutex_);
 
+  const Shape& shape = outfeed_request.shape();
+  if (ShapeUtil::IsNestedTuple(shape)) {
+    return InvalidArgument("Outfeed does not support nested tuple shapes");
+  }
+  if (!LayoutUtil::HasLayout(shape)) {
+    return InvalidArgument("Given shape to Outfeed must have a layout");
+  }
+
   // Verify that operand is valid.
   TF_RETURN_IF_ERROR(LookUpRequest(outfeed_request.operand()).status());
 
@@ -898,7 +908,7 @@ Status UserComputation::AddOutfeedInstruction(
   OperationRequest& request =
       (*session_computation_.mutable_requests())[handle.handle()];
   *request.mutable_output_handle() = handle;
-  *request.mutable_output_shape() = ShapeUtil::MakeNil();
+  *request.mutable_output_shape() = shape;
   *request.mutable_request()->mutable_outfeed_request() = outfeed_request;
 
   VLOG(1) << "AddOutfeedInstruction (" << GetVersionedHandleInternal()
@@ -1989,9 +1999,9 @@ HloInstruction* ComputationLowerer::Visit(
       const OutfeedRequest& outfeed_request =
           request.request().outfeed_request();
       HloInstruction* operand = Visit(outfeed_request.operand(), visited);
-      hlo_instruction =
-          hlo_builder_.AddInstruction(HloInstruction::CreateOutfeed(
-              operand, outfeed_request.outfeed_config()));
+      hlo_instruction = hlo_builder_.AddInstruction(
+          HloInstruction::CreateOutfeed(outfeed_request.shape(), operand,
+                                        outfeed_request.outfeed_config()));
       break;
     }
 
