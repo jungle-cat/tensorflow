@@ -189,7 +189,7 @@ def crf_binary_score(targets, sequence_lengths, transition_params):
   num_tags = array_ops.shape(transition_params)[0]
 
   # encode the indices
-  start_indices = array_ops.concat_v2(
+  start_indices = array_ops.concat(
       [array_ops.zeros([batch_size, 1], dtype=dtypes.int32),
        array_ops.slice(targets, [0, 0], [-1, seq_len-1]) + 1], 1)
   end_indices = array_ops.slice(targets, [0, 0], [-1, seq_len])
@@ -239,7 +239,7 @@ def viterbi_decode(inputs, transition_params, sequence_lengths, name=None):
         matrix.
     sequence_lengths: a [batch_size] vector of sequence lengths.
   """
-  num_tags = inputs.get_shape()[1].value,
+  num_tags = inputs.get_shape()[-1].value,
 
   first_input = array_ops.slice(inputs, [0, 0, 0], [-1, 1, -1])
   first_input = array_ops.squeeze(first_input, [1])
@@ -277,7 +277,7 @@ def viterbi_decode(inputs, transition_params, sequence_lengths, name=None):
       sequence_length=sequence_lengths - 1,
       initial_state=array_ops.expand_dims(last_state_ids, -1),
       dtype=dtypes.int64)
-  viterbis = array_ops.concat_v2([array_ops.expand_dims(last_state_ids, -1),
+  viterbis = array_ops.concat([array_ops.expand_dims(last_state_ids, -1),
                                   array_ops.squeeze(viterbis, [2])], 1)
   viterbis = gen_array_ops.reverse_sequence(viterbis, sequence_lengths, 1)
   return math_ops.to_int32(viterbis, name=name)
